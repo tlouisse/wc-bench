@@ -1,0 +1,404 @@
+<!--
+@license
+Copyright (c) 2016 The Polymer Project Authors. All rights reserved.
+This code may only be used under the BSD style license found at http://polymer.github.io/LICENSE.txt
+The complete set of authors may be found at http://polymer.github.io/AUTHORS.txt
+The complete set of contributors may be found at http://polymer.github.io/CONTRIBUTORS.txt
+Code distributed by Google as part of the polymer project is also
+subject to an additional IP rights grant found at http://polymer.github.io/PATENTS.txt
+-->
+
+<style>
+
+  frame-tester {
+    display: block;
+    font-family: sans-serif;
+    overflow: hidden;
+  }
+
+  frame-tester iframe {
+    position: absolute;
+    border: 0;
+    width: 1920px;
+    height: 1080px;
+    xleft: -2000px;
+    xtop: -2000px;
+    xvisibility: hidden;
+  }
+
+  frame-tester o, frame-tester n {
+    display: inline-block;
+    margin: 2px;
+    text-align: right;
+    font-family: monospace;
+  }
+
+  frame-tester o {
+    color: rgba(255, 0, 0, 0.5);
+  }
+
+  frame-tester n {
+    display: inline-block;
+    color: green;
+    font-weight: bold;
+  }
+
+  frame-tester .card {
+    padding: 16px;
+    box-shadow: 0 8px 10px 1px rgba(0, 0, 0, 0.14),
+                0 3px 14px 2px rgba(0, 0, 0, 0.12),
+                0 5px 5px -3px rgba(0, 0, 0, 0.4);
+    margin: 16px;
+    overflow: hidden;
+    background-color: #fff;
+  }
+</style>
+
+
+<template>
+
+<div id="log"></div>
+
+<iframe id="frame"></iframe>
+
+</template>
+
+
+<script>
+(function() {
+
+///  Helper functions and variables
+function postJSON(obj) {
+  var http = new XMLHttpRequest();
+  http.open("POST", "/result");
+  http.setRequestHeader("Content-Type", "application/json");
+  http.send(JSON.stringify(obj));
+}
+
+var browser = (function(){
+    var ua= navigator.userAgent, tem, 
+    M= ua.match(/(opera|chrome|safari|firefox|msie|trident(?=\/))\/?\s*(\d+)/i) || [];
+    if(/trident/i.test(M[1])){
+        tem=  /\brv[ :]+(\d+)/g.exec(ua) || [];
+        return 'IE '+(tem[1] || '');
+    }
+    if(M[1]=== 'Chrome'){
+        tem= ua.match(/\b(OPR|Edge)\/(\d+)/);
+        if(tem!= null) return tem.slice(1).join(' ').replace('OPR', 'Opera');
+    }
+    M= M[2]? [M[1], M[2]]: [navigator.appName, navigator.appVersion, '-?'];
+    if((tem= ua.match(/version\/(\d+)/i))!= null) M.splice(1, 1, tem[1]);
+    return M.join(' ');
+})();
+
+var OSName="Unknown OS";
+if (navigator.appVersion.indexOf("Win")!=-1) OSName="Windows";
+if (navigator.appVersion.indexOf("Mac")!=-1) OSName="MacOS";
+if (navigator.appVersion.indexOf("X11")!=-1) OSName="UNIX";
+if (navigator.appVersion.indexOf("Linux")!=-1) OSName="Linux";
+
+
+
+/// frame-tester webcomponent
+
+var proto = Object.create(HTMLElement.prototype);
+
+proto._template = (document.currentScript||document._currentScript).ownerDocument.querySelector('template');
+
+proto.createdCallback = function() {
+  var http = new XMLHttpRequest();
+  http.open("POST", "/start");
+  http.setRequestHeader("Content-Type", "application/json");
+  http.send(JSON.stringify({}));
+
+  this.appendChild(document.importNode(this._template.content, true));
+  this.frame = this.querySelector('#frame');
+  this.log = this.querySelector('#log');
+
+  this.attributeChangedCallback('runs', null, this.getAttribute('runs') || 25);
+  this.attributeChangedCallback('base', null, this.getAttribute('base') || '');
+  this.attributeChangedCallback('strategy', null, this.getAttribute('strategy') || 'onedev');
+  this.attributeChangedCallback('noBaseline', null, this.getAttribute('noBaseline') || 'false');
+
+  window.addEventListener('message', this.scoreMessage.bind(this));
+}
+
+proto.attributeChangedCallback = function(name, old, value) {
+  switch(name) {
+    case 'runs':
+      this.runs = value;
+      break;
+    case 'base':
+      this.base = value;
+      break;
+    case 'strategy':
+      this.strategy = this.strategies[value];
+      break;
+    case 'noBaseline':
+      this.noBaseline = (value === 'false' ? false : true);
+      break;
+    }
+};
+
+var testing = {
+
+  get tests() {
+    return this._tests;
+  },
+
+  set tests(value) {
+    this._tests = value;
+    var pathToHere = '../../node_modules/wc-bench/'; // assuming test runner location is /test/wc-bench/index.html (or at least 'two folders from root')
+    if(!this.noBaseline) { // Always include baseline test so relative performance against baseline will be tested 
+      this._tests.unshift(pathToHere + 'client-lib/harness.html?wc-element=input');
+    }
+    for (var i=0; i < this._tests.length;i++ ) {
+      if(this._tests[i].indexOf('harness.html') === 0) {
+        this._tests[i] = pathToHere + 'client-lib/' + this._tests[i];
+      }
+    }
+    this.go();
+  },
+
+  shuffle: function(tests) {
+    var shuffled = [];
+    var ordered = tests.slice(0);
+    var count = ordered.length;
+    for (var i=0, j; i<count; i++) {
+      j = Math.floor(Math.random()*count);
+      // TODO(sjmiles): this is an easy but poorly randomized distribution
+      for (; !ordered[j]; j = (j + 1) % count);
+      shuffled.push(j);
+      ordered[j] = null;
+    }
+    return shuffled;
+  },
+
+  go: function() {
+    this.count = 0;
+    this.total = [];
+    this.times = [];
+    this.infos = [];
+    for (var i=0; i<this.tests.length; i++) {
+      this.total[i] = 0;
+      this.times[i] = [];
+    }
+    this.startRun();
+  },
+
+  startRun: function() {
+    this.shuffled = this.shuffle(this.tests);
+    this.index = -1;
+    //console.group('run', this.count);
+    this.nextTest();
+  },
+
+  nextTest: function() {
+    // last test in this run?
+    if (++this.index === this.tests.length) {
+      //console.groupEnd();
+      // report results
+      ++this.count;
+      this.report();
+      // more runs?
+      if (this.count < this.runs) {
+        this.startRun();
+      } else {
+        // all done!
+        this.dispatchEvent(new CustomEvent('done'));
+      }
+      return;
+    }
+    // test order is randomized
+    this.test = this.shuffled[this.index];
+    this.frame.src = this.base + this.tests[this.test];
+    // it's possible for a test to end before the load event fires,
+    // so assume the frame loads immediately and start waiting
+    // for a result.
+    this.load();
+  },
+
+  load: function() {
+    // frame is loaded, measure the time, then proceed
+    this.measure(function(info) {
+      this.record(info);
+      this.nextTest();
+    });
+  },
+
+  measure: function(next) {
+    this.afterScore = next;
+  },
+
+  scoreMessage: function(e) {
+    if (this.afterScore) {
+      var info = e.data;
+
+      if (typeof info !== 'object') {
+        info = {time: info};
+      }
+      info.timeInt = parseInt(info.time);
+      info.time = Number(info.time.slice(0,-2));
+
+      this.afterScore(info);
+    }
+  },
+
+  record: function(info) {
+    // console.log('record ', this.test);
+
+    //console.log('index [%d], test [%d] time [%d]', this.index, this.test, time);
+    if (!this.infos[this.test]) {
+      this.infos[this.test] = info;
+    }
+    this.times[this.test].push(info.time);
+    this.total[this.test] += info.time;
+  },
+
+  report: function() {
+    var infoObj = {};
+
+    infoObj.runs = this.count + '/' + this.runs;
+    infoObj.tests = [];
+
+    // info: String containing html formatted results
+    var infoHTML = '<br>Runs: ' + infoObj.runs + '<br><br>';
+
+    for (var i=0; i<this.tests.length; i++) {
+
+      // t: Object holding the current test result
+      var t = {
+        url : this.tests[i],
+        total : this.total[i],
+        times : this.times[i],
+        testInfo : this.infos[i]
+      }
+
+      t.stats = this.stats(t.times);
+      t.time = this.strategy.score(t.times, t.stats, this);
+      
+      t.title = (t.testInfo && t.testInfo.info && t.testInfo.info.name) || t.url;
+
+      infoObj.tests[i] = t;
+
+      infoHTML += '<div class="card">'
+        + ' <b>' + (t.time).toFixed(1) + 'ms' + '</b>'
+        //+ ' [stddev: ' + stats.deviation.toFixed(2) + ']'
+        + ' &nbsp;&nbsp;&nbsp;<a href="' + this.base + t.url + '" target="_blank">' + t.title + '</a>'
+        + '<br>'
+        ;
+      //
+      infoHTML += '<span style="font-size: 8px; white-space: nowrap">';
+      for (var j=0, v; j < t.times.length; j++) {
+        var v=t.times[j];
+        if(t.title === 'baseline.html') {console.log('v',v);}
+        var o = t.stats.outlier(v);
+        infoHTML += (o ? '<o>' : '<n>') + v.toFixed(0) + (o ? '</o>' : '</n>') + '|';
+      }
+      infoHTML += '</span>';
+      infoHTML += '</div>';
+    }
+    
+    if(this.runs == this.times[0].length) { // all tests ran
+      this._finalReport(infoObj);
+    }
+    
+    this.log.innerHTML = infoHTML;
+
+  },
+
+  _finalReport: function(infoObj) {
+      var result = {
+        client_system_stats: {
+          browser: browser,
+          os: OSName
+        },
+        results: infoObj
+      }
+      postJSON(result);
+  },
+
+  _getMedian: function(a) {
+    var b = a.slice(0); 
+    // sort b first
+    b.sort(function(x,y) { return x - y });
+    if(b.length % 2 === 0) { 
+        return (b[b.length/2] + b[b.length/2-1])/2;
+    } else { // odd
+      return b[Math.floor(b.length/2)];
+    }
+  },
+
+  stats: function(a) {
+    var r = {mean: 0, variance: 0, deviation: 0}, t = a.length;
+    for (var m, s = 0, l = t; l--; s += a[l]);
+    for (m = r.mean = s / t, l = t, s = 0; l--; s += Math.pow(a[l] - m, 2));
+    r.outlier = this.strategy.outlier;
+    r.median = this._getMedian(a);
+    r.deviation = Math.sqrt(r.variance = s / t);
+    return r;
+  },
+
+  //
+  // selectable statistical strategies
+  //
+
+  strategies: {
+
+    // This strategy selects the minimum timing for score.
+    minimum: {
+      score: function(times, stats) {
+        var min = Number.MAX_VALUE;
+        for (var j=0, v; v=times[j]; j++) {
+          min = Math.min(v, min);
+        }
+        stats.score = min;
+        return min;
+      },
+      // called in stats context
+      outlier: function(value) {
+        return value > this.score;
+      }
+    },
+
+    // This strategy selects the mean of all times not more than one stddev
+    // away from the total sampling mean.
+    onedev: {
+      score: function(times, stats, context) {
+        var cleaned = [];
+        for (var j=0, v; v=times[j]; j++) {
+          if (!stats.outlier(v)) {
+            cleaned.push(v);
+          }
+        }
+        return context.stats(cleaned).mean;
+      },
+      // called in stats context
+      outlier: function(value) {
+        return Math.abs(value - this.mean) > (1 * this.deviation);
+      }
+    },
+
+    // TODO: test this approach and see if it would be more useful than onedev or minimum
+    median: {
+      score: function(times, stats, context) {
+        return context.stats(times).median;
+      },
+      // called in stats context
+      outlier: function(value) {
+        return false; 
+      }
+    } 
+
+  }
+
+};
+
+for (var i in testing) {
+  Object.defineProperty(proto, i, Object.getOwnPropertyDescriptor(testing, i));
+}
+
+document.registerElement('frame-tester', {prototype: proto});
+
+})();
+</script>
