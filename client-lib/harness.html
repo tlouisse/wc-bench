@@ -11,14 +11,13 @@ subject to an additional IP rights grant found at http://polymer.github.io/PATEN
 <html>
 <head>
   <title>element tester</title>
-   <!-- <script src="../../../bower_components/webcomponentsjs/webcomponents-lite.js"></script>  -->
   <link rel="import" href="perf-lib.html">
 </head>
 <body>
 
   <script>
     
-    var elem = { element: null, path: '', count: 1 };
+    var elem = { element: null, path: '', count: 250 };
     location.search.slice(1).split('&').forEach(function(p) {
       for(var i in elem) {
         if(p.split('=')[0] === ('wc-' + i)) {

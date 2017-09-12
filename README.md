@@ -3,15 +3,6 @@
 `wc-bench` is a macro benchmarking tool for (web) components. It spawns a browser that runs `polyperf`[https://github.com/PolymerLabs/polyperf/] on the client. It loads a baseline test, accompanied by one or more component tests (each in their own iframe) a configurable number of times, and presents the result for the selected strategy(minimum, onedev or median). After polyperf has run, results are sent to the wc-bench process, which gives an overview of relative and absolute performance compared to the baseline component and the selected comparison baseline test result(which is the previously tagged version of the git repository by default)
 
 
-## Macro benchmarking vs micro benchmarking
-
-
-
-## Reliability of test result comparisons
-
-
-
-
 ## Installation
 Since polyperf is written in web components,  the webcomponentsjs polyfill needs to be installed via bower
 
@@ -20,60 +11,43 @@ npm install wc-bench
 bower install webcomponentsjs
 ```
 
-## Run
-By default, wc-bench will run a comparison against the performance result of the latest tagged version of the repository
+## Initialization
+To setup your repo, run:
 ```
-wc-bench
+wc-bench --init
 ```
+This will setup your repo with a test runner for your main entry in bower.json.
 
 
-
-Then navigate to  [http://localhost:8080/components/polyperf/sample/runner.html](http://localhost:8080/components/polyperf/sample/runner.html). The results will look something like this:
-
-<img width="469" alt="screen shot 2016-11-03 at 12 54 32" src="https://cloud.githubusercontent.com/assets/1369170/19982787/b20dee9e-a1c4-11e6-8d2b-d7f607eaeff9.png">
-
-The tests are run by `runner.html`, which defines the list of tests to run. Edit `runner.html` to choose test pages to run, and how many times each test should be run. By default, each test runs 25 times, but you can configure it by changing the `frame-tester`'s `runs` attribute:
-
+## Baseline
+In order to be able to do regression test against earlier versions of your component, you must set a baseline (a json file with a stored test run).
 ```
-<frame-tester runs="25"></frame-tester>
+wc-bench --baseline
 ```
+By default, a bseline will be tied to the latest commit (preferably a tag). Make sure there are no uncommitted changes when you run the baseline, because they could affect the performance results. 
 
-There are two different ways to configure your tests:
-
-
-### Using specific tests
-Use this approach if you want to repeat a custom test that does something
-more than just repeating an element in a page.
-
-In `runner.html`, modify the array of tests in `document.querySelector('frame-tester').tests` as follows:
-
+## Compare
+By default, wc-bench will run a comparison against the performance result of the latest tagged version of the repository. Coparing will give you a small report with the differemce between your current code and your stored baseline. Run:
 ```
-document.querySelector('frame-tester').tests = [
-  'test1.html',
-  'test2.html'
-];
+wc-bench --compare
+```
+It's possible to run a comparison against a certain commit or named baseline. Run:
+```
+wc-bench --compare <commit-hash>
 ```
 
-Where `test.1.html` is the specific webpage to test. Each test page should include
 
-```
-<script src="perf-lib/perf.js"></script>
-```
 
-and call
+## Scoring factor
+All runs have a scoring result stored. This is the performance relative to the baseline element(native input).
+The score is the average bootstrap time of your component divided by the average bootstrap time of the input.
+So the lower your score, the better. 
+Please note that scores should only be compared when their tests ran on the same machine, under the same conditions.
 
-```html
-<script>
-  console.perf();
-</script>
-```
 
-before the snippet of code to test, followed by
+## Reliability of test result comparisons
+Make sure to run your tests on a stable machine, with the same setup (browser, OS, available memory / cpu, power supply, etc) between runs.
 
-```html
-<script>
-   console.perfEnd();
-</script>
-```
+Since the client tooling(polyperf) is written for the webcomponentsjs v0 spec and to prevent eventual collisions with the v1 polyfill, only the Chrome browser will be supported currently(which supports the v0 spec by default.)
 
-after the snippet of code to test.
+

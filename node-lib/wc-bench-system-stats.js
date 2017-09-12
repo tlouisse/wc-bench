@@ -8,7 +8,7 @@ function getSystemStats() {
 
   return new Promise((resolve, reject) => {
     try {
-
+      
       let stats = {
         os: {
           platform: os.platform(),

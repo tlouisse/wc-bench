@@ -33,7 +33,6 @@ function run({redirectServer = null, port = 3000} = {}) {
         });
       });
 
-
     } catch (e) {
       reject(e);
     }

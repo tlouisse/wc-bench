@@ -4,6 +4,12 @@ const path = require('path');
 const opn = require('opn');
 const chilp = require('./chilp');
 
+function getRunnerParams(params) {
+  const paramKeys = Object.keys(params);
+  let str = paramKeys.length ? '?' : '';
+  paramKeys.forEach((k,i) =>  str += `wc-${k}=${params[k]}${(i !==paramKeys.length-1) ? '&' : ''}`);
+  return str;
+}
 
 /**
  * 
@@ -11,7 +17,8 @@ const chilp = require('./chilp');
  * @param {number} config.polymer : Polymer version
  * @param {string} config.name : Name of Polymer element (repo name)
  */
-function start({polymer = 2, host = "127.0.1", port = 3000, name = null, testsFolder = null, browser = ['google chrome', '--incognito'] } = {}) {
+function start({polymer = 2, host = "127.0.1", port = 3000, name = null, testsFolder = null, browser = ['google chrome', '--incognito'], strategy = null, runs = null, count = null } = {}) {
+  
   return new Promise((resolve, reject) => {
     try {
 
@@ -27,11 +34,15 @@ function start({polymer = 2, host = "127.0.1", port = 3000, name = null, testsFo
       const redirectServer = polyServer[polymer];
 
       function startBrowser(data) {
+        console.log(data);
         // Polymer serve outputs data, meaning it has spawned. Now automatically open browser
-        const url = `http://${host}:${port}` + `/components/${name}/${testsFolder}/wc-bench/`;
-        opn(url, { app: browser });
-        console.log(`started test in Polymer ${polymer} context for ${browser[0]} on ${url}`);
-        resolve(redirectServer);
+        const url = `http://${host}:${port}` + `/components/${name}/${testsFolder}/wc-bench/${getRunnerParams({strategy, runs, count})}`;
+        opn(url, { wait: false, app: browser })
+          .then(browserProcess => {
+            resolve({browserProcess, redirectServer})
+            console.log(`started test in Polymer ${polymer} context for ${browser[0]} on ${url}`);            
+          })
+          .catch(e => reject(e));        
       }
 
     } catch (e) {

@@ -4,7 +4,7 @@
   "description": "wc-bench is a macro benchmarking tool for (web) components. It spawns a browser that runs `polyperf` on the client, which loads a baseline test + on or more component tests (each in their own iframe) a configurable number of times, and presents the result for the selected strategy(minimum, onedev or median). After polyperf has run, results are sent to the node server, which gives an overview of realtive and absolute performance compared to the baseline component and the baseline test result(which is the previous version by default)",
   "main": "node-lib/wc-bench.js",
   "bin": {
-    "hello": "./node-lib/wc-bench.js"
+    "wc-bench": "./node-lib/wc-bench.js"
   },
   "dependencies": {
     "body-parser": "^1.17.2",
@@ -15,11 +15,15 @@
     "mkdirp": "^0.5.1",
     "opn": "^5.1.0",
     "polymer": "^0.5.0",
-    "promisify-node": "^0.4.0"
+    "promisify-node": "^0.4.0",
+    "tree-kill": "^1.1.0"
   },
   "devDependencies": {},
+  "engines": {
+    "node": ">=8.0" 
+  },
   "_globalDependencies": {
-    "polymer-cli" : "" 
+    "polymer-cli": ""
   },
   "scripts": {
     "start": "node node-lib/wc-bench.js"

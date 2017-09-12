@@ -116,6 +116,7 @@ proto.createdCallback = function() {
   this.log = this.querySelector('#log');
 
   this.attributeChangedCallback('runs', null, this.getAttribute('runs') || 25);
+  this.attributeChangedCallback('count', null, this.getAttribute('count') || 250);
   this.attributeChangedCallback('base', null, this.getAttribute('base') || '');
   this.attributeChangedCallback('strategy', null, this.getAttribute('strategy') || 'onedev');
   this.attributeChangedCallback('noBaseline', null, this.getAttribute('noBaseline') || 'false');
@@ -127,6 +128,9 @@ proto.attributeChangedCallback = function(name, old, value) {
   switch(name) {
     case 'runs':
       this.runs = value;
+      break;
+    case 'count':
+      this.count = value;
       break;
     case 'base':
       this.base = value;
@@ -150,11 +154,11 @@ var testing = {
     this._tests = value;
     var pathToHere = '../../node_modules/wc-bench/'; // assuming test runner location is /test/wc-bench/index.html (or at least 'two folders from root')
     if(!this.noBaseline) { // Always include baseline test so relative performance against baseline will be tested 
-      this._tests.unshift(pathToHere + 'client-lib/harness.html?wc-element=input');
+      this._tests.unshift('harness.html?wc-element=input');
     }
     for (var i=0; i < this._tests.length;i++ ) {
       if(this._tests[i].indexOf('harness.html') === 0) {
-        this._tests[i] = pathToHere + 'client-lib/' + this._tests[i];
+        this._tests[i] = pathToHere + 'client-lib/' + this._tests[i] + '&wc-count=' + this.count;
       }
     }
     this.go();
