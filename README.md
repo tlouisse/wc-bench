@@ -8,7 +8,8 @@ Please install via:
 ```
 npm install wc-bench
 ```
-In order to run wc-bench, chrome, polymer-cli and git need to be installed
+In order to run wc-bench, chrome, polymer-cli and git need to be installed.
+Also, make sure you run node >= 8, you might want to use nvm[https://github.com/creationix/nvm/blob/master/README.md] for this.
 
 
 ## Initialization
