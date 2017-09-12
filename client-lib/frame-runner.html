@@ -1,0 +1,26 @@
+<script>
+(function(){
+
+    window.WcRunner = {};
+
+    // Read out location params   
+    var params = { runs: 25, strategy : 'onedev', count: 250};
+    location.search.slice(1).split('&').forEach(function(p) {
+      for(var i in params) {
+        if(p.split('=')[0] === ('wc-' + i)) {
+          params[i] = p.split('=')[1];
+        }
+      }
+    });
+
+    WcRunner.init = function(frameTester, tests) {
+      if(frameTester && tests) {
+        params.runs && frameTester.setAttribute('runs', params.runs);
+        params.count && frameTester.setAttribute('count', params.count);
+        params.strategy && frameTester.setAttribute('strategy', params.strategy);
+        frameTester.tests = tests;
+      } else throw Error('Please define a reference to the frame-tester element and an array of paths to your (harness) tests');
+    }
+
+}());
+</script>
