@@ -16,8 +16,6 @@ const chilp = require('./chilp');
 const bowerJson = require(process.cwd() + '/bower.json');
 const packageJson = require(process.cwd() + '/package.json');
 
-const kill = require('tree-kill');
-
 // TODO: read this from package.json entry and wc-bench.conf.js
 let config = {
   'resultsFolder' : 'results',
@@ -223,14 +221,10 @@ function compare(newR, oldR) {
       if (program.baseline) {
         baselineSuffix = await handleBaseline();
       } 
-      // if (mode === 'compare' || program.compare) { // since compare can be an option supplied to baseline command
       const canCompare = await checkCompare(); // always do a comparison when possible
-      // }  
       const {browserProcess, redirectServer} = await runner.start(Object.assign(program, config, {name: componentName}));      
       const result = await proxyServer.run({redirectServer: redirectServer, port: program.port });
       await handleResult(result, baselineSuffix, canCompare);
-      // browserProcess.kill('SIGINT');
-      // kill(browserProcess.pid, 'SIGKILL', e => console.log(e));
       process.exit(0)
     }
   } catch (e) {
